@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  backend:
+    container_name: backend-container
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./backend:/app
+      - /app/node_modules # to allow seeing updated dependencies
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: myappdb
+    command: npm run dev # for running nodemon index.js to allow live backend changes as you develop
+    
+  frontend:
+    container_name: frontend-container
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+  
+  db:
+    container_name: db-container
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: myappdb
+    ports:
+      - "5432:5432" 
+    volumes:
+      - db-data:/var/lib/postgresql/data 
+      # Maps a named volume (db-data) to store the database files in the 
+      # container's /var/lib/postgresql/data directory to ensure data persistence across restarts
+
+  # Acts as a fast, in-memory cache to store frequently accessed data, reducing the need for repeated database queries.
+  redis:
+    container_name: redis-container
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+  
+  flyway:
+    container_name: flyway-container
+    image: flyway/flyway
+    depends_on:
+      - db
+    command: -url=jdbc:postgresql://db:5432/myappdb -user=postgres -password=postgres migrate -baselineOnMigrate=true
+    volumes:
+      - ./migrations:/flyway/sql  # Mount the migrations folder to Flyway
+
+  
+volumes:
+  db-data:
